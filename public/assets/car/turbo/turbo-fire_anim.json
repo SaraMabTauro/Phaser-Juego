@@ -1,0 +1,24 @@
+{
+    "anims": [
+        {
+            "key": "fire",
+            "type": "frames",
+            "repeat": -1,
+            "frameRate": 12,
+            "frames": [
+                {
+                    "key": "turbo-fire",
+                    "frame": "turbo-fire_0"
+                },
+                {
+                    "key": "turbo-fire",
+                    "frame": "turbo-fire_1"
+                },
+                {
+                    "key": "turbo-fire",
+                    "frame": "turbo-fire_2"
+                }
+            ]
+        }
+    ]
+}
