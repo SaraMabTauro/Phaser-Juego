@@ -19,7 +19,7 @@ export class RaceScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
     
         //colision entre el carro y el obstáculo
-        this.physics.add.collider(this.player, this.obstacle, this.hitObstacle, null, this);
+        this.physics.add.collider(this.player, this.obstacle, this.gameOver, null, this);
     
         //iniciar
         this.player.start();
@@ -78,7 +78,14 @@ export class RaceScene extends Phaser.Scene {
         clearInterval(this.obstacleProcess);
         clearInterval(this.trackProcess);
 
-        this.scene.start("GameOverScene", { points: this.points });
+        this.player.speed = 0;
+
+        this.cameras.main.shake(500, 0.05);
+        this.cameras.main.flash(500, 255, 0, 0);
+
+        this.time.delayedCall(1000, () => {
+            this.scene.start("GameOverScene", { points: this.points });
+        }, [], this);
     }
 
     update() {
