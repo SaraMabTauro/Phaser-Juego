@@ -29,6 +29,15 @@ export class Car extends Phaser.Physics.Arcade.Image {
         });
     }
 
+    onmessage = function(e) {
+        const player = e.data;
+    
+        //posición del carro
+        player.x += player.speed * 0.01;
+    
+        postMessage(player);
+    };    
+
     move(direction) {
         if (this.state === "can_move") {
             if (direction === "up" && this.y - 10 > 0) {

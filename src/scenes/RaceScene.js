@@ -8,31 +8,28 @@ export class RaceScene extends Phaser.Scene {
     }
 
     create() {
-
         this.add.image(0, 0, "background").setOrigin(0, 0).setScrollFactor(0);
-        
+
         this.track = new Track(this, 0, 0);
         this.player = new Car(this, 100, this.scale.height / 2, 'carrito');
         this.obstacle = new Obstacle(this, this.scale.width + 100, Phaser.Math.Between(50, this.scale.height - 50));
 
-        //configuramos las teclas
-        this.cursors = this.input.keyboard.createCursorKeys();
-    
-        //colision entre el carro y el obstáculo
+        
+        this.cursors = this.input.keyboard.createCursorKeys();//detecta las teclas
+        
+        //colisión entre carro y obstáculo
         this.physics.add.collider(this.player, this.obstacle, this.gameOver, null, this);
-    
-        //iniciar
+        
         this.player.start();
-    
-        //seguimiento de la camara
+        
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
         this.cameras.main.setBounds(0, 0, Number.MAX_SAFE_INTEGER, this.scale.height);
-    
-        // Lanzar Hud
+
         this.scene.launch("HudScene");
+
         this.time.delayedCall(60000, this.gameOver, [], this);
 
-        //puntos
+        //suma de los puntos
         this.points = 0;
         this.time.addEvent({
             delay: 1000,
@@ -41,42 +38,65 @@ export class RaceScene extends Phaser.Scene {
             loop: true
         });
 
+        this.setupWorkers();//se crea y usa
+    }
+
+    setupWorkers() {
+        this.carWorker = new Worker('../gameobjects/Car.js');
+        this.obstacleWorker = new Worker('../gameobjects/Obstruction.js');
+        this.trackWorker = new Worker('../gameobjects/Track.js');
+
+        this.carWorker.onmessage = (e) => {
+            const updatedPlayer = e.data;
+            this.player.x = updatedPlayer.x;
+            this.player.y = updatedPlayer.y;
+        };
+        
+        this.obstacleWorker.onmessage = (e) => {
+            const updatedObstacle = e.data;
+            this.obstacle.x = updatedObstacle.x;
+            this.obstacle.y = updatedObstacle.y;
+        };
+
+        this.trackWorker.onmessage = (e) => {
+            const trackSpeed = e.data.speed;
+            this.track.setSpeed(trackSpeed);
+        };
+
+        //senddatos iniciales a los workers
         this.startConcurrentProcesses();
     }
 
     startConcurrentProcesses() {
-        // Subproceso 1: Movimiento del carro
-        this.carProcess = setInterval(() => {
-            this.player.update();
-        }, 50);
+        setInterval(() => {
+            this.carWorker.postMessage({
+                x: this.player.x,
+                y: this.player.y,
+                speed: this.player.speed
+            });
+            
+            this.obstacleWorker.postMessage({
+                x: this.obstacle.x,
+                y: this.obstacle.y,
+                playerSpeed: this.player.speed,
+                screenWidth: this.scale.width
+            });
 
-        // Subproceso 2: Movimiento del obstáculo
-        this.obstacleProcess = setInterval(() => {
-            this.obstacle.update(this.player.speed);
-        }, 50);
-
-        // Subproceso 3: Ajustar la velocidad de la pista basada en la velocidad del carro
-        this.trackProcess = setInterval(() => {
-            this.track.setSpeed(this.player.speed * 0.1);
+            this.trackWorker.postMessage({
+                speed: this.player.speed
+            });
         }, 50);
     }
 
-    hitObstacle() {
-        if (!this.cameras.main.isShaking) {
-            this.cameras.main.shake(200, 0.01);
-            this.player.speed = Math.max(0, this.player.speed - 50);
-        }
-    }
-    
     updatePoints() {
         this.points += Math.floor(this.player.speed / 10);
         this.scene.get("HudScene").update_points(this.points);
     }
 
     gameOver() {
-        clearInterval(this.carProcess);
-        clearInterval(this.obstacleProcess);
-        clearInterval(this.trackProcess);
+        this.carWorker.terminate();
+        this.obstacleWorker.terminate();
+        this.trackWorker.terminate();
 
         this.player.speed = 0;
 
