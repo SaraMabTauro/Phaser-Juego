@@ -31,6 +31,8 @@ export class Car extends Phaser.Physics.Arcade.Image {
 
     onmessage = function(e) {
         const player = e.data;
+
+        console.log("Carro")
     
         //posición del carro
         player.x += player.speed * 0.01;

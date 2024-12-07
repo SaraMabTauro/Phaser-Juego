@@ -42,48 +42,92 @@ export class RaceScene extends Phaser.Scene {
     }
 
     setupWorkers() {
-        this.carWorker = new Worker('../gameobjects/Car.js');
-        this.obstacleWorker = new Worker('../gameobjects/Obstruction.js');
-        this.trackWorker = new Worker('../gameobjects/Track.js');
+        this.carWorker = new Worker(new URL('../worker/CarWorker.js', import.meta.url), { type: 'module' });
+        this.obstacleWorker = new Worker(new URL('../worker/ObstructionWorker.js', import.meta.url), { type: 'module' });
+        this.trackWorker = new Worker(new URL('../worker/TrackWorker.js', import.meta.url), { type: 'module' });
 
-        this.carWorker.onmessage = (e) => {
-            const updatedPlayer = e.data;
-            this.player.x = updatedPlayer.x;
-            this.player.y = updatedPlayer.y;
-        };
+        // listener de cada worker
+        this.carWorker.addEventListener('message', (e) => {
+            if (e.data.type === 'UPDATED') {
+                console.log('Car Worker Message Received:', e.data.data);
+                this.player.x = e.data.data.x;
+                this.player.y = e.data.data.y;
+            }
+        });
         
-        this.obstacleWorker.onmessage = (e) => {
-            const updatedObstacle = e.data;
-            this.obstacle.x = updatedObstacle.x;
-            this.obstacle.y = updatedObstacle.y;
-        };
+        this.obstacleWorker.addEventListener('message', (e) => {
+            if (e.data.type === 'UPDATED') {
+                console.log('Obstacle Worker Message Received:', e.data.data);
+                this.obstacle.x = e.data.data.x;
+                this.obstacle.y = e.data.data.y;
+            }
+        });
 
-        this.trackWorker.onmessage = (e) => {
-            const trackSpeed = e.data.speed;
-            this.track.setSpeed(trackSpeed);
-        };
+        this.trackWorker.addEventListener('message', (e) => {
+            if (e.data.type === 'UPDATED') {
+                console.log('Track Worker Message Received:', e.data.data);
+                this.track.setSpeed(e.data.data.speed);
+            }
+        });
 
         //senddatos iniciales a los workers
         this.startConcurrentProcesses();
     }
 
     startConcurrentProcesses() {
-        setInterval(() => {
-            this.carWorker.postMessage({
+        // enviar datos iniciales a los workers
+        this.carWorker.postMessage({
+            type: 'INIT',
+            data: {
                 x: this.player.x,
                 y: this.player.y,
                 speed: this.player.speed
-            });
-            
-            this.obstacleWorker.postMessage({
+            }
+        });
+        
+        this.obstacleWorker.postMessage({
+            type: 'INIT',
+            data: {
                 x: this.obstacle.x,
                 y: this.obstacle.y,
                 playerSpeed: this.player.speed,
                 screenWidth: this.scale.width
+            }
+        });
+
+        this.trackWorker.postMessage({
+            type: 'INIT',
+            data: {
+                speed: this.player.speed
+            }
+        });
+
+        // Actualizaciones periodicas
+        this.workerInterval = setInterval(() => {
+            this.carWorker.postMessage({
+                type: 'UPDATE',
+                data: {
+                    x: this.player.x,
+                    y: this.player.y,
+                    speed: this.player.speed
+                }
+            });
+            
+            this.obstacleWorker.postMessage({
+                type: 'UPDATE',
+                data: {
+                    x: this.obstacle.x,
+                    y: this.obstacle.y,
+                    playerSpeed: this.player.speed,
+                    screenWidth: this.scale.width
+                }
             });
 
             this.trackWorker.postMessage({
-                speed: this.player.speed
+                type: 'UPDATE',
+                data: {
+                    speed: this.player.speed
+                }
             });
         }, 50);
     }
@@ -94,6 +138,10 @@ export class RaceScene extends Phaser.Scene {
     }
 
     gameOver() {
+        if (this.workerInterval) {
+            clearInterval(this.workerInterval);
+        }
+
         this.carWorker.terminate();
         this.obstacleWorker.terminate();
         this.trackWorker.terminate();
